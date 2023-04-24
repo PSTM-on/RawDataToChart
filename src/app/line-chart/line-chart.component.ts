@@ -11,12 +11,23 @@ import { HttpClient, HttpHeaders } from '@angular/common/http'
 export class LineChartComponent implements OnInit {
 
   private accountId = '630707744334b0230cb812af';
+
+  // metadata 정보 입력
   private metadata = {
     deviceId: 'DF:4A:35:79:15:C9',
     startTime: 1681891200000,
     endTime: 1681981200000
   }
+
+  // 해당 data의 protocal 입력
   private dataInterval = 200;
+
+  // 상세히 보려는 구간의 data length에 대한 index 입력
+  private sectionToView = {
+    start: null,
+    end: null,
+  };
+
   private dataSet: {
     patchIndex: number;
     ts: number;
@@ -31,10 +42,15 @@ export class LineChartComponent implements OnInit {
   async ngOnInit(): Promise<void> {
     const requestNum = Math.ceil((this.metadata.endTime - this.metadata.startTime) / (60 * 60 * 1000));
 
-    await this.getDataAndSaveToFile(requestNum);
-    // await this.makeChartData(requestNum);
+    // 1. 데이터 먼저 다운로드 : getDataAndSaveToFile
+    // await this.getDataAndSaveToFile(requestNum);
+    
+    // 2. 다운로드 받은 파일을 assets 폴더에 옮긴 뒤 아래 내용 진행
+    await this.makeChartData(requestNum);
     // await this.compensateData();
-    // this.drawChart();
+
+    // 3. 그리려는 차트 선택
+    this.drawChart(['patchIndex', 'ts']);
 
   }
 
@@ -109,6 +125,10 @@ export class LineChartComponent implements OnInit {
           resolve();
         }
       }
+
+      const startIndex = this.sectionToView.start ? this.sectionToView.start : 0;
+      const endIndex = this.sectionToView.end ? this.sectionToView.end : this.dataSet.length - 1;
+      this.dataSet = this.dataSet.slice(startIndex, endIndex + 1);
     });
   }
 
@@ -147,13 +167,17 @@ export class LineChartComponent implements OnInit {
     });
   }
 
-  drawChart() {
+  drawChart(mode: string[]) {
     // set the dimensions and margins of the graph
     const margin = { top: 10, right: 80, bottom: 30, left: 60 };
     const svgSize = 800;
-    const width = svgSize + 200 - margin.left - margin.right;
+    const width = svgSize + 800 - margin.left - margin.right;
     const height = svgSize - margin.top - margin.bottom;
-    
+    let y1 = null;
+    let y2 = null;
+    let valueLine1 = null;
+    let valueLine2 = null;
+
     const svg = d3.select('#chart')
     .append('svg')
     .attr('width', width + margin.left + margin.right)
@@ -161,94 +185,98 @@ export class LineChartComponent implements OnInit {
     .append('g')
     .attr('transform', 'translate(' + margin.left + ',' + margin.top + ')');
 
+    // Add Title
+    const title = svg.append('g')
+      .attr('class', 'title')
+    
+    title.append('text')
+      .attr('x', 18)
+      .attr('y', 20)
+      .style('fill', 'blue')
+      .text('patchIndex Line');
+
+    title.append('text')
+      .attr('x', 150)
+      .attr('y', 20)
+      .style('fill', 'red')
+      .text('ts Line');
+
     // Set X axis
     const x = d3.scaleLinear()
       .domain([0, this.dataSet.length - 1])
       .range([ 0, width ]);
 
-    // Set Y1 axis
-    const y1 = d3.scaleLinear()
-      .domain(d3.extent(this.dataSet, d => d.patchIndex))
-      .range([ height, 0 ]);
-
-    // Set Y2 axis
-    const oneHour = 60 * 60 * 1000;
-    const y2 = d3.scaleLinear()
-      .domain([this.dataSet[0].ts, this.metadata.endTime])
-      .range([ height, 0 ]);
-    
     // Add X axis grid
     svg.append('g')
-    .attr('class', 'grid-x')
-    .attr('transform', 'translate(0,' + height + ')')
-    .call(d3.axisBottom(x).tickSize(-height))
-    .call(g => g.selectAll('.tick line')
-    .attr('stroke-opacity', 0.5)
-    .attr('stroke-dasharray', '2, 2'));
+      .attr('class', 'grid-x')
+      .attr('transform', 'translate(0,' + height + ')')
+      .call(d3.axisBottom(x).tickSize(-height))
+      .call(g => g.selectAll('.tick line')
+      .attr('stroke-opacity', 0.5)
+      .attr('stroke-dasharray', '2, 2'));
 
-    // Add Y1 axis grid
-    svg.append('g')
-    .attr('class', 'grid-y1')
-    .call(d3.axisLeft(y1).tickSize(-width))
-    .call(g => g.selectAll('.tick line')
-    .attr('stroke-opacity', 0.5)
-    .attr('stroke-dasharray', '2, 2'));
+    if (mode.includes('patchIndex')) {
+      // Set Y1 axis
+      y1 = d3.scaleLinear()
+        .domain(d3.extent(this.dataSet, d => d.patchIndex))
+        .range([ height, 0 ]);
 
-    // Add Y2 axis grid
-    svg.append('g')
-    .attr('class', 'grid-y2')
-    .call(d3.axisRight(y2).tickFormat(d => {
-      const dateData = new Date(d);
-      const month = dateData.getMonth().toString().padStart(2, '0');
-      const date = dateData.getDate().toString().padStart(2, '0');
-      const hour = dateData.getHours().toString().padStart(2, '0');
-      const minute = dateData.getMinutes().toString().padStart(2, '0');
-      const second = dateData.getSeconds().toString().padStart(2, '0');
-      return `${month}/${date} ${hour}:${minute}:${second}`;
-    }))
-    .attr('transform', 'translate(' + width + ', 0)');
+      // Add Y1 axis grid
+      svg.append('g')
+      .attr('class', 'grid-y1')
+      .call(d3.axisLeft(y1).tickSize(-width))
+      .call(g => g.selectAll('.tick line')
+      .attr('stroke-opacity', 0.5)
+      .attr('stroke-dasharray', '2, 2'));
 
-    // Add Title
-    const title = svg.append('g')
-    .attr('class', 'title')
-    
-    title.append('text')
-    .attr('x', 18)
-    .attr('y', 20)
-    .style('fill', 'blue')
-    .text('patchIndex Line');
+      // Define line chart1
+      valueLine1 = d3.line()
+        .defined(d => d && d.patchIndex !== null && d.patchIndex !== undefined)
+        .x((d, i) => x(i))
+        .y(d => y1(d.patchIndex));
 
-    title.append('text')
-    .attr('x', 150)
-    .attr('y', 20)
-    .style('fill', 'red')
-    .text('ts Line');
+      // Add the line1
+      svg.append('path')
+        .attr('fill', 'none')
+        .attr('stroke', 'blue')
+        .attr('stroke-width', 1.5)
+        .attr('d', valueLine1(this.dataSet));
+    }
 
-    // Define line chart1
-    const valueLine1 = d3.line()
-      .defined(d => d && d.patchIndex !== null && d.patchIndex !== undefined)
-      .x((d, i) => x(i))
-      .y(d => y1(d.patchIndex));
+    if (mode.includes('ts')) {
+      // Set Y2 axis
+      const oneHour = 60 * 60 * 1000;
+      y2 = d3.scaleLinear()
+        .domain([this.dataSet[0].ts, this.dataSet[this.dataSet.length - 1].ts])
+        .range([ height, 0 ]);
 
-    // Define line chart2
-    const valueLine2 = d3.line()
-      .defined(d => d && d.ts !== null && d.ts !== undefined)
-      .x((d, i) => x(i))
-      .y(d => y2(d.ts));
+      // Add Y2 axis grid
+      svg.append('g')
+      .attr('class', 'grid-y2')
+      .call(d3.axisRight(y2).tickFormat(d => {
+        const dateData = new Date(d);
+        const month = dateData.getMonth().toString().padStart(2, '0');
+        const date = dateData.getDate().toString().padStart(2, '0');
+        const hour = dateData.getHours().toString().padStart(2, '0');
+        const minute = dateData.getMinutes().toString().padStart(2, '0');
+        const second = dateData.getSeconds().toString().padStart(2, '0');
+        return `${month}/${date} ${hour}:${minute}:${second}`;
+      }))
+      .attr('transform', 'translate(' + width + ', 0)');
 
-    // Add the line1
-    svg.append('path')
-      .attr('fill', 'none')
-      .attr('stroke', 'blue')
-      .attr('stroke-width', 1.5)
-      .attr('d', valueLine1(this.dataSet));
+      // Define line chart2
+      valueLine2 = d3.line()
+        .defined(d => d && d.ts !== null && d.ts !== undefined)
+        .x((d, i) => x(i))
+        .y(d => y2(d.ts));
 
-    // Add the line2
-    svg.append('path')
-      .attr('fill', 'none')
-      .attr('stroke', 'red')
-      .attr('stroke-width', 1.5)
-      .attr('d', valueLine2(this.dataSet));
+      // Add the line2
+      svg.append('path')
+        .attr('fill', 'none')
+        .attr('stroke', 'red')
+        .attr('stroke-width', 1.5)
+        .attr('d', valueLine2(this.dataSet));
+    }
 
     // Add tooltip
     const tooltip = svg.append('g')
