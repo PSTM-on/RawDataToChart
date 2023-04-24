@@ -31,10 +31,10 @@ export class LineChartComponent implements OnInit {
   async ngOnInit(): Promise<void> {
     const requestNum = Math.ceil((this.metadata.endTime - this.metadata.startTime) / (60 * 60 * 1000));
 
-    // await this.getDataAndSaveToFile(requestNum);
-    await this.makeChartData(requestNum);
-    await this.compensateData();
-    this.drawChart();
+    await this.getDataAndSaveToFile(requestNum);
+    // await this.makeChartData(requestNum);
+    // await this.compensateData();
+    // this.drawChart();
 
   }
 
