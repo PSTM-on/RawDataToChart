@@ -10,16 +10,24 @@ import { HttpClient, HttpHeaders } from '@angular/common/http'
 
 export class LineChartComponent implements OnInit {
 
-  private accountId = '630707744334b0230cb812af';
+  private dataSet: {
+    patchIndex: number;
+    ts: number;
+    dpTs: number;
+    index: number;
+  }[] = [];
+
+  // 데이터를 다운받으려는 병원의 account Id
+  private accountId = '63d3675c41e7dbf2850b8557';
 
   // metadata 정보 입력
   private metadata = {
-    deviceId: 'DF:4A:35:79:15:C9',
-    startTime: 1681891200000,
-    endTime: 1681981200000
+    deviceId: 'CE:CF:28:43:DC:C3',
+    startTime: 1683609612203,
+    endTime: 1683675654220.0
   }
 
-  // 해당 data의 protocal 입력
+  // 해당 data의 protocal 입력(대부분 200ms임)
   private dataInterval = 200;
 
   // 상세히 보려는 구간의 data length에 대한 index 입력
@@ -28,13 +36,6 @@ export class LineChartComponent implements OnInit {
     end: null,
   };
 
-  private dataSet: {
-    patchIndex: number;
-    ts: number;
-    dpTs: number;
-    index: number;
-  }[] = [];
-
   constructor(
     private http: HttpClient
   ) { }
@@ -42,14 +43,18 @@ export class LineChartComponent implements OnInit {
   async ngOnInit(): Promise<void> {
     const requestNum = Math.ceil((this.metadata.endTime - this.metadata.startTime) / (60 * 60 * 1000));
 
-    // 1. 데이터 먼저 다운로드 : getDataAndSaveToFile
+    /*
+      1번 주석 해제 & 2번 주석 처리
+        -> 데이터 먼저 다운로드 
+      다운로드 받은 파일을 assets 폴더에 모두 넣고, 1번 주석 처리 & 2번 주석 해제
+        -> 차트 그리기
+    */
+
+    // 1번
     // await this.getDataAndSaveToFile(requestNum);
     
-    // 2. 다운로드 받은 파일을 assets 폴더에 옮긴 뒤 아래 내용 진행
+    // 2번
     await this.makeChartData(requestNum);
-    // await this.compensateData();
-
-    // 3. 그리려는 차트 선택
     this.drawChart(['patchIndex', 'ts']);
 
   }
@@ -84,7 +89,11 @@ export class LineChartComponent implements OnInit {
 
   rawDataFiltering(result: any) {
     return new Promise(resolve => {
-      result.data.forEach(d => {
+      if (!result?.data) {
+        resolve(null);
+      }
+
+      result?.data?.forEach(d => {
         d.ts = d.AE.AB;
         d.dpTs = d.AE.AC;
         d.patchIndex = d.AF.AA;
