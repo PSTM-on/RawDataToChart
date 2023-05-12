@@ -10,12 +10,9 @@ import { HttpClient, HttpHeaders } from '@angular/common/http'
 
 export class LineChartComponent implements OnInit {
 
-  private dataSet: {
-    patchIndex: number;
-    ts: number;
-    dpTs: number;
-    index: number;
-  }[] = [];
+  private dataSet: DataSet[] = [];
+  public dataHour = 0;
+  public dataLength = 0;
 
   // 데이터를 다운받으려는 병원의 account Id
   private accountId = '63d3675c41e7dbf2850b8557';
@@ -28,7 +25,7 @@ export class LineChartComponent implements OnInit {
   }
 
   // 해당 data의 protocal 입력(대부분 200ms임)
-  private dataInterval = 200;
+  public dataInterval = 200;
 
   // 상세히 보려는 구간의 data length에 대한 index 입력
   private sectionToView = {
@@ -36,27 +33,53 @@ export class LineChartComponent implements OnInit {
     end: null,
   };
 
+  public requestNum = Math.ceil((this.metadata.endTime - this.metadata.startTime) / (60 * 60 * 1000));
   constructor(
     private http: HttpClient
   ) { }
 
   async ngOnInit(): Promise<void> {
-    const requestNum = Math.ceil((this.metadata.endTime - this.metadata.startTime) / (60 * 60 * 1000));
-
     /*
-      1번 주석 해제 & 2번 주석 처리
-        -> 데이터 먼저 다운로드 
-      다운로드 받은 파일을 assets 폴더에 모두 넣고, 1번 주석 처리 & 2번 주석 해제
-        -> 차트 그리기
+      [ 데이터를 다운받아 사용 ]
     */
-
+    // 1번 주석 해제 & 2번 주석 처리
+    //   -> 데이터 먼저 다운로드 
+    // 다운로드 받은 파일을 assets 폴더에 모두 넣고, 1번 주석 처리 & 2번 주석 해제
+    //   -> 차트 그리기
     // 1번
     // await this.getDataAndSaveToFile(requestNum);
-    
     // 2번
-    await this.makeChartData(requestNum);
+    // await this.makeChartData(requestNum);
+    // this.drawChart(['patchIndex', 'ts']);
+
+
+    /*
+      [ 데이터를 메모리에 저장하여 사용 ]
+    */
+    await this.getDataAndSaveInMemory(this.requestNum);
+    const startIndex = this.sectionToView.start ? this.sectionToView.start : 0;
+    const endIndex = this.sectionToView.end ? this.sectionToView.end : this.dataSet.length - 1;
+    this.dataSet = this.dataSet.slice(startIndex, endIndex + 1);
     this.drawChart(['patchIndex', 'ts']);
 
+  }
+
+  getDataAndSaveInMemory(requestNum: number) {
+    return new Promise<void>(async (resolve) => {
+      for (let i = 1; i <= requestNum; i++) {
+        const startTime = this.metadata.startTime + 60 * 60 * 1000 * (i - 1);
+        const endTime = this.metadata.startTime + 60 * 60 * 1000 * i;
+        const result = await this.getRawDataFromServer(startTime, endTime);
+        const rawData = await this.rawDataFiltering(result);
+        this.dataSet.push(...rawData);
+        this.dataHour = i;
+        this.dataLength += rawData.length;
+
+        if (i === requestNum) {
+          resolve();
+        }
+      }   
+    });
   }
 
   getDataAndSaveToFile(requestNum: number) {
@@ -87,7 +110,7 @@ export class LineChartComponent implements OnInit {
     });
   }
 
-  rawDataFiltering(result: any) {
+  rawDataFiltering(result: any): Promise<DataSet[]> {
     return new Promise(resolve => {
       if (!result?.data) {
         resolve(null);
@@ -336,4 +359,11 @@ export class LineChartComponent implements OnInit {
     const url = window.URL.createObjectURL(blob);
     window.open(url);
   }
+}
+
+export interface DataSet {
+  patchIndex: number;
+  ts: number;
+  dpTs: number;
+  index: number;
 }
