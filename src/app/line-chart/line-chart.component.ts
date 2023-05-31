@@ -19,9 +19,9 @@ export class LineChartComponent implements OnInit {
 
   // metadata 정보 입력
   private metadata = {
-    deviceId: 'CE:CF:28:43:DC:C3',
-    startTime: 1683609612203,
-    endTime: 1683675654220.0
+    deviceId: 'F7:2B:DE:7F:6D:AF',
+    startTime: 1685447693715,
+    endTime: 1685447715261
   }
 
   // 해당 data의 protocal 입력(대부분 200ms임)
@@ -67,8 +67,8 @@ export class LineChartComponent implements OnInit {
   getDataAndSaveInMemory(requestNum: number) {
     return new Promise<void>(async (resolve) => {
       for (let i = 1; i <= requestNum; i++) {
-        const startTime = this.metadata.startTime + 60 * 60 * 1000 * (i - 1);
-        const endTime = this.metadata.startTime + 60 * 60 * 1000 * i;
+        const startTime = i === 1 ? this.metadata.startTime : this.metadata.startTime + 60 * 60 * 1000 * (i - 1);
+        const endTime = i === requestNum ? this.metadata.endTime : this.metadata.startTime + 60 * 60 * 1000 * i;
         const result = await this.getRawDataFromServer(startTime, endTime);
         const rawData = await this.rawDataFiltering(result);
         this.dataSet.push(...rawData);
